@@ -8,10 +8,10 @@
  * 
  * @par Parameters
  * 
- * - @b ~imu_type
- * - @b ~serial_port Serial port that the IMU is connected to (default /dev/ttyUSB0)
- * - ~frame_id Frame identifier if IMU reference frame for message header
- * - ~rate Update rate (default 50Hz)
+ * - @b ~sensor_model LP sensor model identifier (the node has so far been tested with DEVICE_LPMS_U2)
+ * - @b ~port The port that the IMU is connected to (default /dev/ttyUSB0)
+ * - @b ~frame_id Frame identifier if IMU reference frame for message header (default imu_global)
+ * - @b ~rate Update rate, in Hz (default 50)
  */
 
 #include <string>
@@ -29,11 +29,12 @@
 //! Manages connection with the sensor, publishes data
 /*!
   \TODO: Make noncopyable!
+  \TODO: Check axis orientation!
  */
 class LpImuProxy
 {
  public:
-    LpImuProxy() : nh("~")
+    LpImuProxy() : private_nh("~")
     {
 		// Initialize mapping of LPMS sensor types
 		using boost::assign::map_list_of;
@@ -46,9 +47,15 @@ class LpImuProxy
 			                    ("DEVICE_LPMS_U2", DEVICE_LPMS_U2)
                       			("DEVICE_LPMS_C2", DEVICE_LPMS_C2);
 		
+		// Get node parameters
+		private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
+		private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
+		private_nh.param<std::string>("frame_id", frame_id, "imu_global");
+		private_nh.param("rate", rate, 50);
+
 		// Connect to the LP IMU device
         manager = LpmsSensorManagerFactory();
-        imu = manager->addSensor(DEVICE_LPMS_U2, "/dev/ttyUSB0");
+        imu = manager->addSensor(device_map[sensor_model], port.c_str());
 
 		imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
 		mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
@@ -72,7 +79,7 @@ class LpImuProxy
 			// Fill the header
 			// TODO: Use the timestamp provided by the IMU
 			imu_msg.header.stamp = ros::Time::now();
-			imu_msg.header.frame_id = "imu_global";
+			imu_msg.header.frame_id = frame_id;
 
 			// Fill orientation quaternion
 			imu_msg.orientation.w = data.q[0];
@@ -97,7 +104,7 @@ class LpImuProxy
 
 			/* Fill the magnetometer message */
 			mag_msg.header.stamp = imu_msg.header.stamp;
-			mag_msg.header.frame_id = imu_msg.header.frame_id;
+			mag_msg.header.frame_id = frame_id;
 
 			mag_msg.magnetic_field.x = data.b[0];
 			mag_msg.magnetic_field.y = data.b[1];
@@ -112,31 +119,38 @@ class LpImuProxy
 	void run(void)
 	{
 		// The timer ensures periodic data publishing
-		updateTimer = ros::Timer(nh.createTimer(ros::Duration(0.005),
+		updateTimer = ros::Timer(nh.createTimer(ros::Duration(1.0/rate),
 												&LpImuProxy::update,
 												this));
 	}
 
  private:
 
+	// Access to LPMS data
     LpmsSensorManagerI* manager;
     LpmsSensorI* imu;
     ImuData data;
+	std::map<std::string,int> device_map;
 
-	ros::NodeHandle nh;
+	// Access to ROS node
+	ros::NodeHandle nh, private_nh;
 	ros::Timer updateTimer;
 	ros::Publisher imu_pub, mag_pub;
 	sensor_msgs::Imu imu_msg;
 	sensor_msgs::MagneticField mag_msg;
 
-	std::map<std::string,int> device_map;
+	// Parameters
+	std::string sensor_model;
+	std::string port;
+	std::string frame_id;
+	int rate;
 };
 
 int main(int argc, char *argv[])
 {
 
     ros::init(argc, argv, "lpms_imu");
-    ros::NodeHandle nh;
+    ros::NodeHandle nh, private_nh;
 
     LpImuProxy lpImu;
 
