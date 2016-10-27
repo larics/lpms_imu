@@ -16,6 +16,7 @@
 
 #include <string>
 #include <map>
+#include <iostream>
 
 #include <boost/assign/list_of.hpp>
 
@@ -50,7 +51,7 @@ class LpImuProxy
 		// Get node parameters
 		private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
 		private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
-		private_nh.param<std::string>("frame_id", frame_id, "imu_global");
+        private_nh.param<std::string>("frame_id", frame_id, "imu");
 		private_nh.param("rate", rate, 50);
 
 		// Connect to the LP IMU device
@@ -81,11 +82,11 @@ class LpImuProxy
 			imu_msg.header.stamp = ros::Time::now();
 			imu_msg.header.frame_id = frame_id;
 
-			// Fill orientation quaternion
-			imu_msg.orientation.w = data.q[0];
-			imu_msg.orientation.x = data.q[1];
-			imu_msg.orientation.y = data.q[2];
-			imu_msg.orientation.z = data.q[3];
+            // Fill orientation quaternion
+            imu_msg.orientation.w = data.q[0];
+            imu_msg.orientation.x = -data.q[1];
+            imu_msg.orientation.y = -data.q[2];
+            imu_msg.orientation.z = -data.q[3];
 			
 			// Fill angular velocity data
 			imu_msg.angular_velocity.x = data.w[0];
@@ -93,9 +94,9 @@ class LpImuProxy
 			imu_msg.angular_velocity.z = data.w[2];
 
 			// Fill linear acceleration data
-			imu_msg.linear_acceleration.x = data.a[0];
-			imu_msg.linear_acceleration.y = data.a[1];
-			imu_msg.linear_acceleration.z = data.a[2];
+            imu_msg.linear_acceleration.x = data.a[0];
+            imu_msg.linear_acceleration.y = data.a[1];
+            imu_msg.linear_acceleration.z = data.a[2];
 
 			// \TODO: Fill covariance matrices
 			// msg.orientation_covariance = ...
@@ -115,6 +116,41 @@ class LpImuProxy
 			mag_pub.publish(mag_msg);
         }
     }
+
+    void quaternionToEuler(float *q, float *r)
+    {
+        // ZYX Rotation sequence
+        const float r2d = 57.2958f;
+        float w = q[0];
+        float x = q[1];
+        float y = q[2];
+        float z = q[3];
+        float r11 = 2 * (x*y + w*z);
+        float r12 = w*w + x*x - y*y - z*z;
+        float r21 = -2 * (x*z - w*y);
+        float r31 = 2 * (y*z + w*x);
+        float r32 = w*w - x*x - y*y + z*z;
+        r[2] = (float)atan2(r11, r12) * r2d;
+        r[1] = (float)asin(r21) * r2d;
+        r[0] = (float)atan2(r31, r32) * r2d;
+    }
+
+    void eulerToQuaternion(float *r, float *q) {
+        const float r2d = 57.2958f;
+        float x = r[0] / r2d;
+        float z = r[1] / r2d;
+        float y = r[2] / r2d;
+        float c1 = cos(z/2);
+        float s1 = sin(z/2);
+        float c2 = cos(y/2);
+        float s2 = sin(y/2);
+        float c3 = cos(x/2);
+        float s3 = sin(x/2);
+        q[0] =c1*c2*c3 - s1*s2*s3;
+        q[1] =c1*c2*s3 + s1*s2*c3;
+        q[2] =s1*c2*c3 + c1*s2*s3;
+        q[3] =c1*s2*c3 - s1*c2*s3;
+      }
 
 	void run(void)
 	{
