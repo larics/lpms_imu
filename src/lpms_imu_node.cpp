@@ -22,6 +22,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include "ros/ros.h"
+#include "kdl/rotational_interpolation.hpp"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
 
@@ -76,10 +77,15 @@ class LpImuProxy
         {
             data = imu->getCurrentData();
 
+            KDL::Rotation R_world_to_imu = KDL::Rotation::Quaternion(data.q[1],
+                                                                     data.q[2],
+                                                                     data.q[3],
+                                                                     data.q[0]);
+
             /* Fill the IMU message */
 
             // Fill the header
-            // TODO: Use the timestamp provided by the IMU
+            // TODO: Use the timestamp provided by the IMU	
             imu_msg.header.stamp = ros::Time::now();
             imu_msg.header.frame_id = frame_id;
 
@@ -90,9 +96,17 @@ class LpImuProxy
             imu_msg.orientation.z = -data.q[3];
 
             // Fill angular velocity data
-            imu_msg.angular_velocity.x = data.w[0]/180*3.1415926;
-            imu_msg.angular_velocity.y = data.w[1]/180*3.1415926;
-            imu_msg.angular_velocity.z = data.w[2]/180*3.1415926;
+            // - transform data to IMU local frame
+            KDL::Vector w_in(data.w[0]/180*3.1415926,
+                             data.w[1]/180*3.1415926,
+                             data.w[2]/180*3.1415926);
+            
+            KDL::Vector w_out = R_world_to_imu * w_in;
+
+            // - write transformed data to message
+            imu_msg.angular_velocity.x = w_out.x();
+            imu_msg.angular_velocity.y = w_out.y();
+            imu_msg.angular_velocity.z = w_out.z();
 
             // Fill linear acceleration data
             imu_msg.linear_acceleration.x = -data.a[0]*9.805;
