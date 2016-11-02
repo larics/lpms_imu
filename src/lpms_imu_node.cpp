@@ -17,6 +17,8 @@
 #include <string>
 #include <map>
 
+#include <iostream>
+
 #include <boost/assign/list_of.hpp>
 
 #include "ros/ros.h"
@@ -88,14 +90,14 @@ class LpImuProxy
             imu_msg.orientation.z = -data.q[3];
 
             // Fill angular velocity data
-            imu_msg.angular_velocity.x = data.w[0];
-            imu_msg.angular_velocity.y = data.w[1];
-            imu_msg.angular_velocity.z = data.w[2];
+            imu_msg.angular_velocity.x = data.w[0]/180*3.1415926;
+            imu_msg.angular_velocity.y = data.w[1]/180*3.1415926;
+            imu_msg.angular_velocity.z = data.w[2]/180*3.1415926;
 
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = data.a[0];
-            imu_msg.linear_acceleration.y = data.a[1];
-            imu_msg.linear_acceleration.z = data.a[2];
+            imu_msg.linear_acceleration.x = -data.a[0]*9.805;
+            imu_msg.linear_acceleration.y = -data.a[1]*9.805;
+            imu_msg.linear_acceleration.z = -data.a[2]*9.805;
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
