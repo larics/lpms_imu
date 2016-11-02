@@ -9,6 +9,9 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
 )
 
+find_package(orocos_kdl REQUIRED)
+#find_path(Eigen3)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -114,6 +117,7 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  /usr/include/eigen3
 )
 
 # Find the LP Sensor library
@@ -130,6 +134,7 @@ add_executable(lpms_imu_node src/lpms_imu_node.cpp)
 target_link_libraries(lpms_imu_node
   ${catkin_LIBRARIES}
   ${Lp_LIBRARY}
+  ${orocos_kdl_LIBRARIES}
  )
 
 #############
