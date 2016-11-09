@@ -97,22 +97,14 @@ class LpImuProxy
 
             // Fill angular velocity data
             // - scale from deg/s to rad/s
-            KDL::Vector w_in(data.w[0]*3.1415926/180,
-                             data.w[1]*3.1415926/180,
-                             data.w[2]*3.1415926/180);
-
-            // - transform data to IMU local frame
-            KDL::Vector w_out = R_world_to_imu * w_in;
-
-            // - write transformed data to message
-            imu_msg.angular_velocity.x = w_out.x();
-            imu_msg.angular_velocity.y = w_out.y();
-            imu_msg.angular_velocity.z = w_out.z();
+            imu_msg.angular_velocity.x = data.g[0]*3.1415926/180;
+            imu_msg.angular_velocity.y = data.g[1]*3.1415926/180;
+            imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
 
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = data.linAcc[0];
-            imu_msg.linear_acceleration.y = data.linAcc[1];
-            imu_msg.linear_acceleration.z = data.linAcc[2];
+            imu_msg.linear_acceleration.x = -data.a[0]*9.805;
+            imu_msg.linear_acceleration.y = -data.a[1]*9.805;
+            imu_msg.linear_acceleration.z = -data.a[2]*9.805;
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
