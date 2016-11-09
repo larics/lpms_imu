@@ -102,9 +102,9 @@ class LpImuProxy
             imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
 
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = -data.a[0]*9.805;
-            imu_msg.linear_acceleration.y = -data.a[1]*9.805;
-            imu_msg.linear_acceleration.z = -data.a[2]*9.805;
+            imu_msg.linear_acceleration.x = -data.a[0]*9.81;
+            imu_msg.linear_acceleration.y = -data.a[1]*9.81;
+            imu_msg.linear_acceleration.z = -data.a[2]*9.81;
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
@@ -115,9 +115,9 @@ class LpImuProxy
             mag_msg.header.stamp = imu_msg.header.stamp;
             mag_msg.header.frame_id = frame_id;
 
-            mag_msg.magnetic_field.x = data.b[0];
-            mag_msg.magnetic_field.y = data.b[1];
-            mag_msg.magnetic_field.z = data.b[2];
+            mag_msg.magnetic_field.x = data.b[0]*9.81;
+            mag_msg.magnetic_field.y = data.b[1]*9.81;
+            mag_msg.magnetic_field.z = data.b[2]*9.81;
 
             // Publish the messages
             imu_pub.publish(imu_msg);
