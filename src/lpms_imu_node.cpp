@@ -17,12 +17,9 @@
 #include <string>
 #include <map>
 
-#include <iostream>
-
 #include <boost/assign/list_of.hpp>
 
 #include "ros/ros.h"
-#include "kdl/rotational_interpolation.hpp"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
 
@@ -54,7 +51,7 @@ class LpImuProxy
         private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
         private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
         private_nh.param<std::string>("frame_id", frame_id, "imu");
-        private_nh.param("rate", rate, 50);
+        private_nh.param("rate", rate, 200);
 
         // Connect to the LP IMU device
         manager = LpmsSensorManagerFactory();
@@ -62,6 +59,8 @@ class LpImuProxy
 
         imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
         mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
+
+
     }
     
     ~LpImuProxy(void)
@@ -76,11 +75,6 @@ class LpImuProxy
                 imu->hasImuData())
         {
             data = imu->getCurrentData();
-
-            KDL::Rotation R_world_to_imu = KDL::Rotation::Quaternion(data.q[1],
-                                                                     data.q[2],
-                                                                     data.q[3],
-                                                                     data.q[0]);
 
             /* Fill the IMU message */
 
