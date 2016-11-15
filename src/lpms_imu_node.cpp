@@ -17,8 +17,6 @@
 #include <string>
 #include <map>
 
-#include <iostream>
-
 #include <boost/assign/list_of.hpp>
 
 #include "ros/ros.h"
