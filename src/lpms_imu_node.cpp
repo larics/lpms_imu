@@ -17,6 +17,8 @@
 #include <string>
 #include <map>
 
+#include <iostream>
+
 #include <boost/assign/list_of.hpp>
 
 #include "ros/ros.h"
@@ -53,6 +55,13 @@ class LpImuProxy
         private_nh.param<std::string>("frame_id", frame_id, "imu");
         private_nh.param("rate", rate, 200);
 
+        // Timestamp tuning
+        private_nh.param("enable_tuning", enable_tuning, true);
+        private_nh.param("tune_kp", tune_kp,  0/1024);
+        private_nh.param("tune_ki", tune_ki, -1/1024);
+        private_nh.param("tune_kd", tune_kd,  0/1024);
+
+
         // Connect to the LP IMU device
         manager = LpmsSensorManagerFactory();
         imu = manager->addSensor(device_map[sensor_model], port.c_str());
@@ -80,7 +89,7 @@ class LpImuProxy
 
             // Fill the header
             // TODO: Use the timestamp provided by the IMU	
-            imu_msg.header.stamp = ros::Time::now();
+            imu_msg.header.stamp = enable_tuning ? sync_timestamp(data.timeStamp) : ros::Time::now();
             imu_msg.header.frame_id = frame_id;
 
             // Fill orientation quaternion
@@ -147,6 +156,48 @@ class LpImuProxy
     std::string port;
     std::string frame_id;
     int rate;
+
+    /* TIMESTAMP TUNING */
+    bool enable_tuning;
+
+    // - previous state variables
+    double p_imu;
+    double p_ros;
+    double p_out;
+    double p_err;
+
+    double i_err;
+
+    // - tuning PID parameters
+    int tune_kp;
+    int tune_ki;
+    int tune_kd;
+
+    ros::Time sync_timestamp(double c_imu){
+        double c_ros = ros::Time::now().toSec();
+
+        if(data.frameCount < 50){
+            p_imu = c_imu;
+            p_out = c_ros;
+        }
+
+        double c_err = p_out + (c_imu - p_imu) - c_ros; // difference between current and calculated time
+        double d_err = c_err - p_err; // derivative of error
+        i_err = i_err + c_err; // integral of error
+
+        double pid_res = tune_kp*c_err + tune_ki*i_err + tune_kd*d_err;
+
+        double c_out = p_out + (c_imu - p_imu);
+
+        p_imu = c_imu;
+        p_ros = c_ros;
+        p_out = c_out;
+        p_err = c_err;
+
+        //ROS_INFO("ROS_TIME: %f\tTIMESTAMP: %f\tERROR: %f\tPID_RES: %f", c_ros, c_out, c_err, pid_res);
+
+        return ros::Time(c_out);
+    }
 };
 
 int main(int argc, char *argv[])
