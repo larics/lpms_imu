@@ -1,13 +1,13 @@
-/** 
+/**
  * @file
  * @brief ROS driver for the LP IMU sensor
- * 
+ *
  * @par Advertises
  *
- * - @b data Calibrated IMU data 
- * 
+ * - @b data Calibrated IMU data
+ *
  * @par Parameters
- * 
+ *
  * - @b ~sensor_model LP sensor model identifier (the node has so far been tested with DEVICE_LPMS_U2)
  * - @b ~port The port that the IMU is connected to (default /dev/ttyUSB0)
  * - @b ~frame_id Frame identifier if IMU reference frame for message header (default imu_global)
@@ -17,8 +17,6 @@
 #include <string>
 #include <map>
 
-#include <boost/assign/list_of.hpp>
-
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
@@ -26,10 +24,11 @@
 #include "lpsensor/LpmsSensorI.h"
 #include "lpsensor/LpmsSensorManagerI.h"
 
+#include "timesync/TimestampSynchronizer.h"
+
 //! Manages connection with the sensor, publishes data
 /*!
   \TODO: Make noncopyable!
-  \TODO: Check axis orientation!
  */
 class LpImuProxy
 {
@@ -37,15 +36,14 @@ class LpImuProxy
     LpImuProxy() : private_nh("~")
     {
         // Initialize mapping of LPMS sensor types
-        using boost::assign::map_list_of;
-        device_map = map_list_of("DEVICE_LPMS_B", DEVICE_LPMS_B)
-                                ("DEVICE_LPMS_U", DEVICE_LPMS_U)
-                                ("DEVICE_LPMS_C", DEVICE_LPMS_C)
-                                ("DEVICE_LPMS_BLE", DEVICE_LPMS_BLE)
-                                ("DEVICE_LPMS_RS232", DEVICE_LPMS_RS232)
-                                ("DEVICE_LPMS_B2", DEVICE_LPMS_B2)
-                                ("DEVICE_LPMS_U2", DEVICE_LPMS_U2)
-                                  ("DEVICE_LPMS_C2", DEVICE_LPMS_C2);
+        device_map = {{"DEVICE_LPMS_B", DEVICE_LPMS_B},
+                      {"DEVICE_LPMS_U", DEVICE_LPMS_U},
+                      {"DEVICE_LPMS_C", DEVICE_LPMS_C},
+                      {"DEVICE_LPMS_BLE", DEVICE_LPMS_BLE},
+                      {"DEVICE_LPMS_RS232", DEVICE_LPMS_RS232},
+                      {"DEVICE_LPMS_B2", DEVICE_LPMS_B2},
+                      {"DEVICE_LPMS_U2", DEVICE_LPMS_U2},
+                      {"DEVICE_LPMS_C2", DEVICE_LPMS_C2}};
 
         // Get node parameters
         private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
@@ -53,12 +51,8 @@ class LpImuProxy
         private_nh.param<std::string>("frame_id", frame_id, "imu");
         private_nh.param("rate", rate, 200);
 
-        // Timestamp tuning
-        private_nh.param("enable_tuning", enable_tuning, true);
-        private_nh.param("tune_kp", tune_kp,  0/1024);
-        private_nh.param("tune_ki", tune_ki, -1/1024);
-        private_nh.param("tune_kd", tune_kd,  0/1024);
-
+        // Timestamp synchronization
+        private_nh.param("enable_time_sync", enable_Tsync, true);
 
         // Connect to the LP IMU device
         manager = LpmsSensorManagerFactory();
@@ -67,9 +61,8 @@ class LpImuProxy
         imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
         mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
 
-
     }
-    
+
     ~LpImuProxy(void)
     {
         manager->removeSensor(imu);
@@ -86,8 +79,8 @@ class LpImuProxy
             /* Fill the IMU message */
 
             // Fill the header
-            // TODO: Use the timestamp provided by the IMU	
-            imu_msg.header.stamp = enable_tuning ? sync_timestamp(data.timeStamp) : ros::Time::now();
+            // TODO: Use the timestamp provided by the IMU
+            imu_msg.header.stamp = enable_Tsync ? time_sync.sync(data.timeStamp, ros::Time::now().toSec(), data.frameCount) : ros::Time::now();
             imu_msg.header.frame_id = frame_id;
 
             // Fill orientation quaternion
@@ -155,47 +148,9 @@ class LpImuProxy
     std::string frame_id;
     int rate;
 
-    /* TIMESTAMP TUNING */
-    bool enable_tuning;
-
-    // - previous state variables
-    double p_imu;
-    double p_ros;
-    double p_out;
-    double p_err;
-
-    double i_err;
-
-    // - tuning PID parameters
-    int tune_kp;
-    int tune_ki;
-    int tune_kd;
-
-    ros::Time sync_timestamp(double c_imu){
-        double c_ros = ros::Time::now().toSec();
-
-        if(data.frameCount < 50){
-            p_imu = c_imu;
-            p_out = c_ros;
-        }
-
-        double c_err = p_out + (c_imu - p_imu) - c_ros; // difference between current and calculated time
-        double d_err = c_err - p_err; // derivative of error
-        i_err = i_err + c_err; // integral of error
-
-        double pid_res = tune_kp*c_err + tune_ki*i_err + tune_kd*d_err;
-
-        double c_out = p_out + (c_imu - p_imu);
-
-        p_imu = c_imu;
-        p_ros = c_ros;
-        p_out = c_out;
-        p_err = c_err;
-
-        //ROS_INFO("ROS_TIME: %f\tTIMESTAMP: %f\tERROR: %f\tPID_RES: %f", c_ros, c_out, c_err, pid_res);
-
-        return ros::Time(c_out);
-    }
+    // Timestamp syncronization
+    bool enable_Tsync;
+    TimestampSynchronizer time_sync;
 };
 
 int main(int argc, char *argv[])
