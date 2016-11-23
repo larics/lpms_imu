@@ -122,7 +122,7 @@ class LpImuProxy
     void run(void)
     {
         // The timer ensures periodic data publishing
-        updateTimer = ros::Timer(nh.createTimer(ros::Duration(1.0/rate),
+        updateTimer = ros::Timer(nh.createTimer(ros::Duration(0.1/rate),
                                                 &LpImuProxy::update,
                                                 this));
     }
