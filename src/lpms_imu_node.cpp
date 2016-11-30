@@ -61,6 +61,21 @@ class LpImuProxy
         imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
         mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
 
+        TimestampSynchronizer::Options defaultSyncOptions;
+        defaultSyncOptions.useMedianFilter = true;
+        defaultSyncOptions.medianFilterWindow = 1500;
+        defaultSyncOptions.useHoltWinters = true;
+        defaultSyncOptions.alfa_HoltWinters = 4e-4;
+        defaultSyncOptions.beta_HoltWinters = 3e-4;
+        defaultSyncOptions.alfa_HoltWinters_early = 5e-2;
+        defaultSyncOptions.beta_HoltWinters_early = 1e-3;
+        defaultSyncOptions.earlyClamp = true;
+        defaultSyncOptions.earlyClampWindow = 120*200;
+        defaultSyncOptions.timeOffset = 0.0;
+        defaultSyncOptions.initialB_HoltWinters = -3.4e-7;
+        defaultSyncOptions.nameSuffix = std::string();
+        pstampSynchronizer = std::make_unique<TimestampSynchronizer>(defaultSyncOptions);
+
     }
 
     ~LpImuProxy(void)
@@ -79,8 +94,7 @@ class LpImuProxy
             /* Fill the IMU message */
 
             // Fill the header
-            // TODO: Use the timestamp provided by the IMU
-            imu_msg.header.stamp = enable_Tsync ? time_sync.sync(data.timeStamp, ros::Time::now().toSec(), data.frameCount) : ros::Time::now();
+            imu_msg.header.stamp = enable_Tsync ? ros::Time(pstampSynchronizer->sync(data.timeStamp, ros::Time::now().toSec(), data.frameCount)) : ros::Time::now();
             imu_msg.header.frame_id = frame_id;
 
             // Fill orientation quaternion
@@ -150,7 +164,8 @@ class LpImuProxy
 
     // Timestamp syncronization
     bool enable_Tsync;
-    TimestampSynchronizer time_sync;
+
+    std::unique_ptr<TimestampSynchronizer> pstampSynchronizer;
 };
 
 int main(int argc, char *argv[])

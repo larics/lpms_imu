@@ -30,3 +30,5 @@
 
 # Temporary files
 *.user
+.idea/
+cmake-build-debug/
