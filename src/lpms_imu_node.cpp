@@ -1,13 +1,13 @@
-/** 
+/**
  * @file
  * @brief ROS driver for the LP IMU sensor
- * 
+ *
  * @par Advertises
  *
- * - @b data Calibrated IMU data 
- * 
+ * - @b data Calibrated IMU data
+ *
  * @par Parameters
- * 
+ *
  * - @b ~sensor_model LP sensor model identifier (the node has so far been tested with DEVICE_LPMS_U2)
  * - @b ~port The port that the IMU is connected to (default /dev/ttyUSB0)
  * - @b ~frame_id Frame identifier if IMU reference frame for message header (default imu_global)
@@ -17,8 +17,6 @@
 #include <string>
 #include <map>
 
-#include <boost/assign/list_of.hpp>
-
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/MagneticField.h"
@@ -26,10 +24,11 @@
 #include "lpsensor/LpmsSensorI.h"
 #include "lpsensor/LpmsSensorManagerI.h"
 
+#include "timesync/TimestampSynchronizer.h"
+
 //! Manages connection with the sensor, publishes data
 /*!
   \TODO: Make noncopyable!
-  \TODO: Check axis orientation!
  */
 class LpImuProxy
 {
@@ -37,21 +36,23 @@ class LpImuProxy
     LpImuProxy() : private_nh("~")
     {
         // Initialize mapping of LPMS sensor types
-        using boost::assign::map_list_of;
-        device_map = map_list_of("DEVICE_LPMS_B", DEVICE_LPMS_B)
-                                ("DEVICE_LPMS_U", DEVICE_LPMS_U)
-                                ("DEVICE_LPMS_C", DEVICE_LPMS_C)
-                                ("DEVICE_LPMS_BLE", DEVICE_LPMS_BLE)
-                                ("DEVICE_LPMS_RS232", DEVICE_LPMS_RS232)
-                                ("DEVICE_LPMS_B2", DEVICE_LPMS_B2)
-                                ("DEVICE_LPMS_U2", DEVICE_LPMS_U2)
-                                  ("DEVICE_LPMS_C2", DEVICE_LPMS_C2);
+        device_map = {{"DEVICE_LPMS_B", DEVICE_LPMS_B},
+                      {"DEVICE_LPMS_U", DEVICE_LPMS_U},
+                      {"DEVICE_LPMS_C", DEVICE_LPMS_C},
+                      {"DEVICE_LPMS_BLE", DEVICE_LPMS_BLE},
+                      {"DEVICE_LPMS_RS232", DEVICE_LPMS_RS232},
+                      {"DEVICE_LPMS_B2", DEVICE_LPMS_B2},
+                      {"DEVICE_LPMS_U2", DEVICE_LPMS_U2},
+                      {"DEVICE_LPMS_C2", DEVICE_LPMS_C2}};
 
         // Get node parameters
         private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
         private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
         private_nh.param<std::string>("frame_id", frame_id, "imu");
-        private_nh.param("rate", rate, 50);
+        private_nh.param("rate", rate, 200);
+
+        // Timestamp synchronization
+        private_nh.param("enable_time_sync", enable_Tsync, true);
 
         // Connect to the LP IMU device
         manager = LpmsSensorManagerFactory();
@@ -59,8 +60,24 @@ class LpImuProxy
 
         imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
         mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
+
+        TimestampSynchronizer::Options defaultSyncOptions;
+        defaultSyncOptions.useMedianFilter = true;
+        defaultSyncOptions.medianFilterWindow = 1500;
+        defaultSyncOptions.useHoltWinters = true;
+        defaultSyncOptions.alfa_HoltWinters = 4e-4;
+        defaultSyncOptions.beta_HoltWinters = 3e-4;
+        defaultSyncOptions.alfa_HoltWinters_early = 5e-2;
+        defaultSyncOptions.beta_HoltWinters_early = 1e-3;
+        defaultSyncOptions.earlyClamp = true;
+        defaultSyncOptions.earlyClampWindow = 120*200;
+        defaultSyncOptions.timeOffset = 0.0;
+        defaultSyncOptions.initialB_HoltWinters = -3.4e-7;
+        defaultSyncOptions.nameSuffix = std::string();
+        pstampSynchronizer = std::make_unique<TimestampSynchronizer>(defaultSyncOptions);
+
     }
-    
+
     ~LpImuProxy(void)
     {
         manager->removeSensor(imu);
@@ -77,8 +94,7 @@ class LpImuProxy
             /* Fill the IMU message */
 
             // Fill the header
-            // TODO: Use the timestamp provided by the IMU
-            imu_msg.header.stamp = ros::Time::now();
+            imu_msg.header.stamp = enable_Tsync ? ros::Time(pstampSynchronizer->sync(data.timeStamp, ros::Time::now().toSec(), data.frameCount)) : ros::Time::now();
             imu_msg.header.frame_id = frame_id;
 
             // Fill orientation quaternion
@@ -88,14 +104,15 @@ class LpImuProxy
             imu_msg.orientation.z = -data.q[3];
 
             // Fill angular velocity data
-            imu_msg.angular_velocity.x = data.w[0];
-            imu_msg.angular_velocity.y = data.w[1];
-            imu_msg.angular_velocity.z = data.w[2];
+            // - scale from deg/s to rad/s
+            imu_msg.angular_velocity.x = data.g[0]*3.1415926/180;
+            imu_msg.angular_velocity.y = data.g[1]*3.1415926/180;
+            imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
 
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = data.a[0];
-            imu_msg.linear_acceleration.y = data.a[1];
-            imu_msg.linear_acceleration.z = data.a[2];
+            imu_msg.linear_acceleration.x = -data.a[0]*9.81;
+            imu_msg.linear_acceleration.y = -data.a[1]*9.81;
+            imu_msg.linear_acceleration.z = -data.a[2]*9.81;
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
@@ -106,9 +123,9 @@ class LpImuProxy
             mag_msg.header.stamp = imu_msg.header.stamp;
             mag_msg.header.frame_id = frame_id;
 
-            mag_msg.magnetic_field.x = data.b[0];
-            mag_msg.magnetic_field.y = data.b[1];
-            mag_msg.magnetic_field.z = data.b[2];
+            mag_msg.magnetic_field.x = data.b[0]*9.81;
+            mag_msg.magnetic_field.y = data.b[1]*9.81;
+            mag_msg.magnetic_field.z = data.b[2]*9.81;
 
             // Publish the messages
             imu_pub.publish(imu_msg);
@@ -119,7 +136,7 @@ class LpImuProxy
     void run(void)
     {
         // The timer ensures periodic data publishing
-        updateTimer = ros::Timer(nh.createTimer(ros::Duration(1.0/rate),
+        updateTimer = ros::Timer(nh.createTimer(ros::Duration(0.1/rate),
                                                 &LpImuProxy::update,
                                                 this));
     }
@@ -144,6 +161,11 @@ class LpImuProxy
     std::string port;
     std::string frame_id;
     int rate;
+
+    // Timestamp syncronization
+    bool enable_Tsync;
+
+    std::unique_ptr<TimestampSynchronizer> pstampSynchronizer;
 };
 
 int main(int argc, char *argv[])

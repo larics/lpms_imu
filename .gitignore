@@ -27,3 +27,8 @@
 *.exe
 *.out
 *.app
+
+# Temporary files
+*.user
+.idea/
+cmake-build-debug/
