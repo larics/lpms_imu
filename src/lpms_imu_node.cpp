@@ -73,7 +73,6 @@ class LpImuProxy
         defaultSyncOptions.earlyClampWindow = 120*200;
         defaultSyncOptions.timeOffset = 0.0;
         defaultSyncOptions.initialB_HoltWinters = -3.4e-7;
-        defaultSyncOptions.nameSuffix = std::string();
         pstampSynchronizer = std::make_unique<TimestampSynchronizer>(defaultSyncOptions);
 
     }
