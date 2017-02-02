@@ -122,9 +122,10 @@ class LpImuProxy
             mag_msg.header.stamp = imu_msg.header.stamp;
             mag_msg.header.frame_id = frame_id;
 
-            mag_msg.magnetic_field.x = data.b[0]*9.81;
-            mag_msg.magnetic_field.y = data.b[1]*9.81;
-            mag_msg.magnetic_field.z = data.b[2]*9.81;
+            // Units are microTesla in the LPMS library, Tesla in ROS.
+            mag_msg.magnetic_field.x = data.b[0]*1e-6;
+            mag_msg.magnetic_field.y = data.b[1]*1e-6;
+            mag_msg.magnetic_field.z = data.b[2]*1e-6;
 
             // Publish the messages
             imu_pub.publish(imu_msg);
