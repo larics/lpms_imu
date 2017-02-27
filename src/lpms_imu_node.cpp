@@ -50,6 +50,7 @@ class LpImuProxy
         private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
         private_nh.param<std::string>("frame_id", frame_id, "imu");
         private_nh.param("rate", rate, 200);
+        private_nh.param("return_linear_acceleration", return_linear_acceleration, true);
 
         // Timestamp synchronization
         private_nh.param("enable_time_sync", enable_Tsync, true);
@@ -108,10 +109,17 @@ class LpImuProxy
             imu_msg.angular_velocity.y = data.g[1]*3.1415926/180;
             imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
 
+	    std::cout << data.linAcc[1] << " " << data.a[1] << std::endl;
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = -data.a[0]*9.81;
-            imu_msg.linear_acceleration.y = -data.a[1]*9.81;
-            imu_msg.linear_acceleration.z = -data.a[2]*9.81;
+            if (return_linear_acceleration) {
+                imu_msg.linear_acceleration.x = data.linAcc[0]*9.81;
+                imu_msg.linear_acceleration.y = data.linAcc[1]*9.81;
+                imu_msg.linear_acceleration.z = data.linAcc[2]*9.81;
+            } else {
+                imu_msg.linear_acceleration.x = -data.a[0]*9.81;
+                imu_msg.linear_acceleration.y = -data.a[1]*9.81;
+                imu_msg.linear_acceleration.z = -data.a[2]*9.81;
+            }
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
@@ -161,6 +169,12 @@ class LpImuProxy
     std::string port;
     std::string frame_id;
     int rate;
+
+    // The imu_msg wants linear acceleration which commonly refers to
+    // the acceleration with the acceleration due to gravity removed.
+    // But the user might want to get the non-gravity corrected
+    // acceleration.  Set this to false to obtain it.
+    bool return_linear_acceleration;
 
     // Timestamp syncronization
     bool enable_Tsync;
