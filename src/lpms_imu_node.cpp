@@ -109,7 +109,6 @@ class LpImuProxy
             imu_msg.angular_velocity.y = data.g[1]*3.1415926/180;
             imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
 
-	    std::cout << data.linAcc[1] << " " << data.a[1] << std::endl;
             // Fill linear acceleration data
             if (return_linear_acceleration) {
                 imu_msg.linear_acceleration.x = data.linAcc[0]*9.81;
