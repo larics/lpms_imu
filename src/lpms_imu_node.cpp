@@ -104,14 +104,14 @@ class LpImuProxy
 
             // Fill angular velocity data
             // - scale from deg/s to rad/s
-            imu_msg.angular_velocity.x = data.g[0]*3.1415926/180;
-            imu_msg.angular_velocity.y = data.g[1]*3.1415926/180;
-            imu_msg.angular_velocity.z = data.g[2]*3.1415926/180;
+            imu_msg.angular_velocity.x = data.g[0]*deg2rad;
+            imu_msg.angular_velocity.y = data.g[1]*deg2rad;
+            imu_msg.angular_velocity.z = data.g[2]*deg2rad;
 
             // Fill linear acceleration data
-            imu_msg.linear_acceleration.x = -data.a[0]*9.81;
-            imu_msg.linear_acceleration.y = -data.a[1]*9.81;
-            imu_msg.linear_acceleration.z = -data.a[2]*9.81;
+            imu_msg.linear_acceleration.x = -data.a[0]*g;
+            imu_msg.linear_acceleration.y = -data.a[1]*g;
+            imu_msg.linear_acceleration.z = -data.a[2]*g;
 
             // \TODO: Fill covariance matrices
             // msg.orientation_covariance = ...
@@ -166,7 +166,14 @@ class LpImuProxy
     bool enable_Tsync;
 
     std::unique_ptr<TimestampSynchronizer> pstampSynchronizer;
+
+    // Data conversion constants
+    static const double deg2rad;
+    static const double g;
 };
+
+const double LpImuProxy::deg2rad = 3.1415926/180.0;
+const double LpImuProxy::g = 9.81;
 
 int main(int argc, char *argv[])
 {
