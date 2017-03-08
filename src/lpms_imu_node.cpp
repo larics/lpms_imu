@@ -14,6 +14,7 @@
  * - @b ~rate Update rate, in Hz (default 50)
  */
 
+#include <cmath> // for M_PI
 #include <string>
 #include <map>
 
@@ -172,7 +173,7 @@ class LpImuProxy
     static const double g;
 };
 
-const double LpImuProxy::deg2rad = 3.1415926/180.0;
+const double LpImuProxy::deg2rad = M_PI/180.0;
 const double LpImuProxy::g = 9.81;
 
 int main(int argc, char *argv[])
