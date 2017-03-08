@@ -48,7 +48,7 @@ class LpImuProxy
         // Get node parameters
         private_nh.param<std::string>("sensor_model", sensor_model, "DEVICE_LPMS_U2");
         private_nh.param<std::string>("port", port, "/dev/ttyUSB0");
-        private_nh.param<std::string>("frame_id", frame_id, "imu");
+        private_nh.param<std::string>("frame_id", frame_id, "imu_link");
         private_nh.param("rate", rate, 200);
 
         // Timestamp synchronization
@@ -58,7 +58,7 @@ class LpImuProxy
         manager = LpmsSensorManagerFactory();
         imu = manager->addSensor(device_map[sensor_model], port.c_str());
 
-        imu_pub = nh.advertise<sensor_msgs::Imu>("imu",1);
+        imu_pub = nh.advertise<sensor_msgs::Imu>("data",1);
         mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag",1);
 
         TimestampSynchronizer::Options defaultSyncOptions;
